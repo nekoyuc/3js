@@ -6,6 +6,7 @@
     <style>
         body {
             margin: 0;
+            background-color: lightcyan
         }
 
         canvas {
@@ -19,62 +20,153 @@
     <script>
         // Scene setup
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight,
-            0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-        const renderer = new THREE.WebGLRenderer();
+        const renderer = new THREE.WebGLRenderer({ antialias: true }); // Enable anti-aliasing
+        renderer.setClearColor('lightcyan');
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
         // Add a cube
         const geometry = new THREE.BoxGeometry();
-        const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-        const cube = new THREE.Mesh(
-            geometry, material);
+        const material = new THREE.MeshBasicMaterial({ color: 'crimson' });
+        const cube = new THREE.Mesh(geometry, material);
         scene.add(cube);
 
-        camera.position.z
-            = 5;
+        // Add wireframe edges to the cube
+        const edges = new THREE.WireframeGeometry(geometry);
+        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 'black' }));
+        cube.add(line);
+
+        // Add a green world land
+        const landGeometry = new THREE.PlaneGeometry(10, 10);
+        const landMaterial = new THREE.MeshBasicMaterial({ color: 'lightseagreen', transparent: true, opacity: 0.5 });
+        const land = new THREE.Mesh(landGeometry, landMaterial);
+        land.rotation.x = Math.PI / 2; // Rotate the land to be perpendicular to the y-axis
+        land.position.y -= 1;
+        scene.add(land);
+
+        const wallGeometry = new THREE.PlaneGeometry(10, 10);
+        const wallMaterial = new THREE.MeshBasicMaterial({ color: 'mediumpurple', transparent: true, opacity: 0.5 });
+        const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+        scene.add(wall);
+
+        camera.position.z = 5;
 
         // Mouse controls (basic orbit controls)
         let isDragging = false;
-        let previousMousePosition = {
-            x: 0,
-            y: 0
-        };
+        let aroundObject = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let aroundMousePosition = { x: 0, y: 0 };
+        let theta = 0;
+        let phi = 0;
+
         document.addEventListener('mousedown', (event) => {
             isDragging = true;
-            previousMousePosition = {
-                x: event.clientX,
-                y: event.clientY
-            };
+            previousMousePosition = { x: event.clientX, y: event.clientY };
+            theta = Math.atan2(camera.position.z - cube.position.z, camera.position.x - cube.position.x);
+            phi = Math.acos((camera.position.y - cube.position.y) / Math.sqrt((camera.position.x - cube.position.x) * (camera.position.x - cube.position.x) + (camera.position.y - cube.position.y) * (camera.position.y - cube.position.y) + (camera.position.z - cube.position.z) * (camera.position.z - cube.position.z)));
         });
-        document.addEventListener('mouseup',
-            () => {
-                isDragging = false;
-            });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            aroundObject = false;
+            console.log('not around object');
+        });
+
+        // TODO: render back faces of planes
         document.addEventListener('mousemove', (event) => {
             if (!isDragging) return;
-            const
-                deltaX = event.clientX - previousMousePosition.x;
-            const deltaY = event.clientY - previousMousePosition.y;
-            previousMousePosition = {
-                x: event.clientX,
-                y: event.clientY
+            dist_X = camera.position.x - cube.position.x;
+            dist_Y = camera.position.y - cube.position.y;
+            dist_Z = camera.position.z - cube.position.z;
+            radius = Math.sqrt(dist_X * dist_X + dist_Y * dist_Y + dist_Z * dist_Z);
+            if (cube.userData.selected && aroundObject == true) {
+                const deltaX = event.clientX - aroundMousePosition.x;
+                const deltaY = event.clientY - aroundMousePosition.y;
+                theta += 0;
+                //theta += deltaX * 0.01;
+                phi += -deltaY * 0.01;
 
-            };
-            camera.rotation.y += deltaX * 0.01;
-            camera.rotation.x += deltaY * 0.01;
+                // Corrected camera position calculation
+                camera.position.x = cube.position.x + radius * Math.sin(phi) * Math.cos(theta);
+                camera.position.y = cube.position.y + radius * Math.cos(phi);
+                camera.position.z = cube.position.z + radius * Math.sin(phi) * Math.sin(theta);
+                console.log('camera x = ' + camera.position.x + ' y = ' + camera.position.y + ' z = ' + camera.position.z);
+                camera.lookAt(cube.position);
+
+                aroundMousePosition = { x: event.clientX, y: event.clientY };
+            } 
+            else if (cube.userData.selected && aroundObject == false){
+                aroundMousePosition = { x: event.clientX, y: event.clientY };
+                console.log('around mouse position');
+            }
+            else{
+                const deltaX = event.clientX - previousMousePosition.x;
+                const deltaY = event.clientY - previousMousePosition.y;
+                previousMousePosition = { x: event.clientX, y: event.clientY };
+                camera.rotation.y += deltaX * 0.001;
+                camera.rotation.x += deltaY * 0.001;
+            }
+            aroundObject = true;
+            console.log('around object');
         });
 
+        // Zoom-in function
+        document.addEventListener('wheel', (event) => {
+            const zoomSpeed = 0.001;
+            camera.position.z += event.deltaY * zoomSpeed;
+            console.log('Zooming in...');
+        });
+
+        // Raycasting
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        // Mouse click event handler
+        function onMouseClick(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1; // Normalize mouse x for Normalized Device Coordinates (NDC)
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1; // Normalize mouse y for NDC
+
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(scene.children);
+
+            if (intersects.length > 0) {
+                const closestObject = intersects[0].object;
+                if (closestObject === cube) {
+                    cube.userData.selected = !cube.userData.selected;
+                    if (cube.userData.selected) {
+                        cube.material.color.set('gold');
+                    } else {
+                        cube.material.color.set('crimson');
+                    }
+                }
+            }
+        }
+
+        window.addEventListener('click', onMouseClick, false);
+        //document.addEventListener('click', onMouseClick, false);
+
         // Render loop
+        let angle = 0;
         function animate() {
             requestAnimationFrame(animate);
-            cube.rotation.x += 0.01;
-            cube.rotation.y += 0.01;
-            renderer.render(scene,
-                camera);
+            //cube.rotation.x += 0.01;
+            //cube.rotation.y += 0.01;
+
+            /*
+            if (cube.userData.selected){
+                angle += 0.01;
+                camera.position.x = 5 * Math.sin(angle);
+                camera.position.z = 5 * Math.cos(angle);
+                camera.lookAt(cube.position);
+            }
+            */
+            renderer.render(scene, camera);
         }
         animate();
     </script>
 </body>
+
+</html>
