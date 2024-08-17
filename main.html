@@ -6,30 +6,46 @@
     <style>
         body {
             margin: 0;
-            background-color: lightcyan
+            background-color: lightgray;
         }
 
         canvas {
             display: block;
         }
 
-        #buttons {
+        #renderView{
+            display: flex;
+        }
+
+        #toolbar {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 100;
+            background-color: brown;
+            min-width: 100px;
+            max-width: 120px;
+            width: 20%;
+            height: 100%;
         }
     </style>
 </head>
 
 <body>
-    <div id="buttons">
+    <div id="toolbar">
         <button id="redBrush">Red Brush</button>
         <button id="greenBrush">Green Brush</button>
         <button id="blueBrush">Blue Brush</button>
     </div>
+    <div id="renderView">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
     <script>
+        /*
+        // Create a new iframe element
+        const iframe = document.createElement('iframe');
+        iframe.src = 'https://www.vectospace.com'; // Replace with the URL of the document you want to add
+        iframe.style.width = '30%';
+        iframe.style.height = '500px';
+        document.body.appendChild(iframe);
+        */
+        
         // Scene setup
         const scene = new THREE.Scene();
         const raycaster = new THREE.Raycaster();
@@ -50,25 +66,22 @@
 
         const objects = [];
 
+        const toolbarContainer = document.getElementById('toolbar');
+        let toolbarWidth = toolbarContainer.clientWidth;
+        let availableWidth = window.innerWidth - toolbarWidth;
+        
+        const renderViewContainer = document.getElementById('renderView');
+        renderViewContainer.style.width = availableWidth + 'px';
+        const renderViewWidth = renderViewContainer.clientWidth;
+        const renderViewHeight = renderViewContainer.clientHeight;
+        console.log(renderViewWidth, renderViewHeight, toolbarWidth);
+
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.z = 5;
         const renderer = new THREE.WebGLRenderer({ antialias: true }); // Enable anti-aliasing
         renderer.setClearColor('lightcyan');
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
-
-        // Add a light
-        const light = new THREE.DirectionalLight('red', 1);
-        light.position.set(3, 4, 1);
-        scene.add(light);
-        // Add an ambient light
-        const ambientLight = new THREE.AmbientLight('white', 0.5);
-        scene.add(ambientLight);
-
-        // render light effect
-        const helper = new THREE.DirectionalLightHelper(light, 5);
-        scene.add(helper);
-
 
         // Add a cube
         const geometry = new THREE.BoxGeometry();
@@ -95,7 +108,6 @@
         const wallMaterial = new THREE.MeshBasicMaterial({ color: 'mediumpurple', transparent: true, opacity: 0.5, side: THREE.DoubleSide }); // Render from both sides
         const wall = new THREE.Mesh(wallGeometry, wallMaterial);
         scene.add(wall);
-
 
         // Find the point in front of the camera
         function getPointInFrontOfCamera(distance) {
@@ -260,6 +272,9 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            toolbarWidth = toolbarContainer.clientWidth;
+            availableWidth = window.innerWidth - toolbarWidth;
+            renderViewContainer.style.width = availableWidth + 'px';
         }
         window.addEventListener('resize', onWindowResize, false);
 
@@ -267,9 +282,12 @@
         function animate() {
             requestAnimationFrame(animate);
             renderer.render(scene, camera);
+            console.log(renderViewContainer.clientWidth, renderViewContainer.clientHeight, toolbarWidth);
         }
         animate();
+
     </script>
+    </div>
 </body>
 
 </html>
