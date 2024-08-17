@@ -14,16 +14,19 @@
         }
 
         #renderView{
+            position: absolute;
             display: flex;
         }
 
         #toolbar {
             position: absolute;
+            align-items: center;
             background-color: brown;
             min-width: 100px;
             max-width: 120px;
             width: 20%;
             height: 100%;
+            right: 0px;
         }
     </style>
 </head>
@@ -69,18 +72,17 @@
         const toolbarContainer = document.getElementById('toolbar');
         let toolbarWidth = toolbarContainer.clientWidth;
         let availableWidth = window.innerWidth - toolbarWidth;
-        
         const renderViewContainer = document.getElementById('renderView');
         renderViewContainer.style.width = availableWidth + 'px';
-        const renderViewWidth = renderViewContainer.clientWidth;
-        const renderViewHeight = renderViewContainer.clientHeight;
+        let renderViewWidth = renderViewContainer.clientWidth;
+        let renderViewHeight = renderViewContainer.clientHeight;
         console.log(renderViewWidth, renderViewHeight, toolbarWidth);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(75, renderViewWidth / window.innerHeight, 0.1, 1000);
         camera.position.z = 5;
         const renderer = new THREE.WebGLRenderer({ antialias: true }); // Enable anti-aliasing
         renderer.setClearColor('lightcyan');
-        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setSize(renderViewWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
         // Add a cube
@@ -150,7 +152,7 @@
             aroundObject = false;
         });
         document.addEventListener('mousemove', (event) => {
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1; // Normalize mouse x for Normalized Device Coordinates (NDC)
+            mouse.x = (event.clientX / availableWidth) * 2 - 1; // Normalize mouse x for Normalized Device Coordinates (NDC)
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1; // Normalize mouse y for NDC
             if (!isDragging) return;
             // This is basically rotation when left mouse button is held
@@ -269,12 +271,15 @@
 
         // Resize event handler
         function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
             toolbarWidth = toolbarContainer.clientWidth;
             availableWidth = window.innerWidth - toolbarWidth;
             renderViewContainer.style.width = availableWidth + 'px';
+            renderViewWidth = renderViewContainer.clientWidth;
+            console.log(renderViewWidth, renderViewHeight, toolbarWidth);
+
+            camera.aspect = renderViewWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(renderViewWidth, window.innerHeight);
         }
         window.addEventListener('resize', onWindowResize, false);
 
@@ -282,7 +287,6 @@
         function animate() {
             requestAnimationFrame(animate);
             renderer.render(scene, camera);
-            console.log(renderViewContainer.clientWidth, renderViewContainer.clientHeight, toolbarWidth);
         }
         animate();
 
