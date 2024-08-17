@@ -4,38 +4,32 @@
 <head>
     <title>MODN</title>
     <style>
-        #container {
-            display: flex;
-            height: 100vh;
-            justify-content: center;
-            align-items: center;
+        body {
+            margin: 0;
+            background-color: lightcyan
         }
-        
-        #toolbar {
-            flex: 0 0 200px;
-            justify-content: right;
-            align-items: right;
+
+        canvas {
+            display: block;
         }
-            
-        #canvas-container {
-            flex: 1;
+
+        #buttons {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
         }
-    </style>
     </style>
 </head>
 
 <body>
-        <div id = "toolbar">
-            <button id = "redBrush">Red Brush</button>
-            <button id = "greenBrush">Green Brush</button>
-            <button id = "blueBrush">Blue Brush</button>
-        </div>
-        <div id = "canvas-container">
-        
+    <div id="buttons">
+        <button id="redBrush">Red Brush</button>
+        <button id="greenBrush">Green Brush</button>
+        <button id="blueBrush">Blue Brush</button>
+    </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
     <script>
-        const canvasContainer = document.getElementById('canvas-container');
-        const toolbar = document.getElementById('toolbar');
         // Scene setup
         const scene = new THREE.Scene();
         const raycaster = new THREE.Raycaster();
@@ -57,18 +51,11 @@
         const objects = [];
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        // get the width and height of the canvas container
-        const width = canvasContainer.clientWidth
-        const height = canvasContainer.clientHeight
-        const width2 = toolbar.clientWidth;
-        const height2 = toolbar.clientHeight;
-        console.log(width, height, width2, height2);
         camera.position.z = 5;
         const renderer = new THREE.WebGLRenderer({ antialias: true }); // Enable anti-aliasing
         renderer.setClearColor('lightcyan');
         renderer.setSize(window.innerWidth, window.innerHeight);
-        //document.body.appendChild(renderer.domElement);
-        canvasContainer.appendChild(renderer.domElement);
+        document.body.appendChild(renderer.domElement);
 
         // Add a light
         const light = new THREE.DirectionalLight('red', 1);
@@ -283,7 +270,6 @@
         }
         animate();
     </script>
-    </div>
 </body>
 
 </html>
