@@ -13,7 +13,7 @@
             display: block;
         }
 
-        #renderView{
+        #renderView {
             position: absolute;
             display: flex;
         }
@@ -21,276 +21,313 @@
         #toolbar {
             position: absolute;
             align-items: center;
-            background-color: brown;
+            background-color: lightgray;
+            box-sizing: border-box;
+            border: 2px solid black;
             min-width: 100px;
             max-width: 120px;
             width: 20%;
             height: 100%;
             right: 0px;
+            
+        }
+
+        #toolbar button {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            width: 80%;
+            height: 30px;
+            margin: 10%;
+            background-color: white;
+            color: black;
+            border-radius: 5px;
+            border: 1px solid black;
+            cursor: pointer;
+        }
+
+        #toolbar button.active {
+            background-color: #4CAF50;
         }
     </style>
 </head>
 
 <body>
     <div id="toolbar">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
+        <script src="src_functions.js"></script>
         <button id="redBrush">Red Brush</button>
         <button id="greenBrush">Green Brush</button>
         <button id="blueBrush">Blue Brush</button>
+        <script>
+            // Button event handlers
+            document.getElementById('redBrush').addEventListener('click', () => {
+                activateBrushColor = 'red';
+                highlightButton('redBrush');
+                console.log("red brush activated");
+            });
+            document.getElementById('greenBrush').addEventListener('click', () => {
+                activateBrushColor = 'green';
+                highlightButton('greenBrush');
+                console.log("green brush activated");
+            });
+            document.getElementById('blueBrush').addEventListener('click', () => {
+                activateBrushColor = 'blue';
+                highlightButton('blueBrush');
+                console.log("blue brush activated");
+            });
+            highlightButton('redBrush');
+        </script>
     </div>
     <div id="renderView">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
-    <script>
-        /*
-        // Create a new iframe element
-        const iframe = document.createElement('iframe');
-        iframe.src = 'https://www.vectospace.com'; // Replace with the URL of the document you want to add
-        iframe.style.width = '30%';
-        iframe.style.height = '500px';
-        document.body.appendChild(iframe);
-        */
-        
-        // Scene setup
-        const scene = new THREE.Scene();
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-        let cameraType = 'perspective'; // Default camera type
-        let isDragging = false;
-        let aroundObject = false;
-        let previousMousePosition = { x: 0, y: 0 };
-        let aroundMousePosition = { x: 0, y: 0 };
-        let frontPoint = new THREE.Vector3();
-        let rotationBase = new THREE.Vector3();
-        let rotationRadius = 0;
-        let theta = 0;
-        let phi = 0;
-        let buttonPressed = "";
-        let selectedObject = null;
-        let activateBrushColor = 'red';
+        <script>
+            // Scene setup
+            const scene = new THREE.Scene();
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            let isDragging = false;
+            let aroundObject = false;
+            let previousMousePosition = { x: 0, y: 0 };
+            let aroundMousePosition = { x: 0, y: 0 };
+            let frontPoint = new THREE.Vector3();
+            let rotationBase = new THREE.Vector3();
+            let rotationRadius = 0;
+            let theta = 0;
+            let phi = 0;
+            let buttonPressed = "";
+            let selectedObject = null;
+            let activateBrushColor = 'red';
 
-        const objects = [];
+            const objects = [];
+            const brushButtons = [];
 
-        const toolbarContainer = document.getElementById('toolbar');
-        let toolbarWidth = toolbarContainer.clientWidth;
-        let availableWidth = window.innerWidth - toolbarWidth;
-        const renderViewContainer = document.getElementById('renderView');
-        renderViewContainer.style.width = availableWidth + 'px';
-        let renderViewWidth = renderViewContainer.clientWidth;
-        let renderViewHeight = renderViewContainer.clientHeight;
-        console.log(renderViewWidth, renderViewHeight, toolbarWidth);
-
-        const camera = new THREE.PerspectiveCamera(75, renderViewWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 5;
-        const renderer = new THREE.WebGLRenderer({ antialias: true }); // Enable anti-aliasing
-        renderer.setClearColor('lightcyan');
-        renderer.setSize(renderViewWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
-
-        // Add a cube
-        const geometry = new THREE.BoxGeometry();
-        const material = new THREE.MeshBasicMaterial({ color: 'crimson', side: THREE.DoubleSide }); // Render from both sides
-        const cube = new THREE.Mesh(geometry, material);
-        cube.userData.selectable = 'true'; // Add the attribute to the cube
-        objects.push(cube);
-        scene.add(cube);
-        // Add wireframe edges to the cube
-        const edges = new THREE.WireframeGeometry(geometry);
-        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 'black' }));
-        cube.add(line);
-
-        // Add a green world land
-        const landGeometry = new THREE.PlaneGeometry(10, 10);
-        const landMaterial = new THREE.MeshBasicMaterial({ color: 'lightseagreen', transparent: true, opacity: 0.5, side: THREE.DoubleSide }); // Render from both sides
-        const land = new THREE.Mesh(landGeometry, landMaterial);
-        land.rotation.x = Math.PI / 2; // Rotate the land to be perpendicular to the y-axis
-        land.position.y -= 0.5;
-        scene.add(land);
-
-        // Add a purple wall
-        const wallGeometry = new THREE.PlaneGeometry(10, 10);
-        const wallMaterial = new THREE.MeshBasicMaterial({ color: 'mediumpurple', transparent: true, opacity: 0.5, side: THREE.DoubleSide }); // Render from both sides
-        const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-        scene.add(wall);
-
-        // Find the point in front of the camera
-        function getPointInFrontOfCamera(distance) {
-            const direction = new THREE.Vector3();
-            camera.getWorldDirection(direction);
-            const point = new THREE.Vector3();
-            point.copy(camera.position).add(direction.multiplyScalar(distance));
-            return point;
-        }
-
-        // Get distance between two points
-        function getDistance(point1, point2) {
-            return Math.sqrt((point1.x - point2.x) * (point1.x - point2.x) + (point1.y - point2.y) * (point1.y - point2.y) + (point1.z - point2.z) * (point1.z - point2.z));
-        }
-
-        // Mouse event handlers
-        document.addEventListener('mousedown', (event) => {
-            isDragging = true;
-            frontPoint = getPointInFrontOfCamera(3);
-            if (event.button == 0 && cube.userData.selected) {
-                buttonPressed = "left";
-                rotationRadius = getDistance(camera.position, cube.position);
-                theta = Math.atan2(camera.position.z - cube.position.z, camera.position.x - cube.position.x);
-                phi = Math.acos((camera.position.y - cube.position.y) / rotationRadius);
-            }
-            else if (event.button == 0 && !cube.userData.selected) {
-                buttonPressed = "left";
-                rotationRadius = getDistance(camera.position, frontPoint);
-                theta = Math.atan2(camera.position.z - frontPoint.z, camera.position.x - frontPoint.x);
-                phi = Math.acos((camera.position.y - frontPoint.y) / getDistance(camera.position, frontPoint));
-            }
-            else if (event.button == 1) {
-                buttonPressed = "middle";
-                previousMousePosition = { x: event.clientX, y: event.clientY };
-            }
-            else { buttonPressed = "none"; }
-        });
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-            aroundObject = false;
-        });
-        document.addEventListener('mousemove', (event) => {
-            mouse.x = (event.clientX / availableWidth) * 2 - 1; // Normalize mouse x for Normalized Device Coordinates (NDC)
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1; // Normalize mouse y for NDC
-            if (!isDragging) return;
-            // This is basically rotation when left mouse button is held
-            if (buttonPressed == "left" && aroundObject) {
-                if (cube.userData.selected) { rotationBase = cube.position; }
-                else { rotationBase = frontPoint; }
-
-                const deltaX = event.clientX - aroundMousePosition.x;
-                const deltaY = event.clientY - aroundMousePosition.y;
-                aroundMousePosition = { x: event.clientX, y: event.clientY };
-                theta += deltaX * 0.005;
-                phi += -deltaY * 0.005;
-                phi = Math.min(Math.PI - 0.01, Math.max(0.01, phi));
-
-                camera.position.x = rotationBase.x + rotationRadius * Math.sin(phi) * Math.cos(theta);
-                camera.position.y = rotationBase.y + rotationRadius * Math.cos(phi);
-                camera.position.z = rotationBase.z + rotationRadius * Math.sin(phi) * Math.sin(theta);
-
-                if (cube.userData.selected) { camera.lookAt(cube.position); }
-                else { camera.lookAt(frontPoint); }
-            }
-            // This is only used to find the first mouse position for rotation setup
-            else if (buttonPressed == "left" && aroundObject == false) {
-                aroundMousePosition = { x: event.clientX, y: event.clientY };
-            }
-            // This is basically translation when middle mouse button is held
-            else if (buttonPressed == "middle") {
-                const deltaX = event.clientX - previousMousePosition.x;
-                const deltaY = event.clientY - previousMousePosition.y;
-                previousMousePosition = { x: event.clientX, y: event.clientY };
-
-                const cameraDeltaX = -deltaX * 0.01;
-                const cameraDeltaY = deltaY * 0.01;
-
-                const cameraDirection = new THREE.Vector3();
-                camera.getWorldDirection(cameraDirection);
-
-                const cameraRight = new THREE.Vector3();
-                cameraRight.crossVectors(cameraDirection, new THREE.Vector3(0, 1, 0));
-                cameraRight.normalize();
-
-                const cameraUp = new THREE.Vector3();
-                cameraUp.crossVectors(cameraRight, cameraDirection);
-                cameraUp.normalize();
-
-                camera.position.add(cameraRight.multiplyScalar(cameraDeltaX));
-                camera.position.add(cameraUp.multiplyScalar(cameraDeltaY));
-            }
-            else {
-                // Nothing happens
-            }
-            // This is triggered only after the mouse is pressed and the object is selected
-            aroundObject = true;
-        });
-
-        // Zoom-in function
-        document.addEventListener('wheel', (event) => {
-            const zoomSpeed = 0.003;
-            const zoomDirection = new THREE.Vector3();
-            camera.getWorldDirection(zoomDirection);
-            camera.position.add(zoomDirection.multiplyScalar(event.deltaY * zoomSpeed));
-            console.log('Zooming in...');
-        });
-
-        // Raycasting
-        
-
-        // Button event handlers
-        document.getElementById('redBrush').addEventListener('click', () => {
-            activateBrushColor = 'red';
-        });
-        document.getElementById('greenBrush').addEventListener('click', () => {
-            activateBrushColor = 'green';
-        });
-        document.getElementById('blueBrush').addEventListener('click', () => {
-            activateBrushColor = 'blue';
-        });
-
-        // Paint brush event handler
-        document.addEventListener('keydown', (event) => {
-            if (event.code === 'Space') {
-                raycaster.setFromCamera(mouse, camera);
-                console.log("paint brush activated");
-                const intersects = raycaster.intersectObjects(scene.children);
-                if (intersects.length > (0)) {
-
-                    const closestObject = intersects[0].object;
-                    if (closestObject.userData.selectable) {
-                        closestObject.material.color.set(activateBrushColor);
-                    }
-                }
-            }
-        });
-
-        // Mouse click event handler
-        function onMouseClick(event) {
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(scene.children);
-
-            if (intersects.length > 0) {
-                console.log("find object");
-                const closestObject = intersects[0].object;
-                if (closestObject.userData.selectable) {
-                    closestObject.userData.selected = !closestObject.userData.selected;
-                    if (closestObject.userData.selected) {
-                        closestObject.material.color.set('gold');
-                        selectedObject = closestObject;
-                    } else {
-                        closestObject.material.color.set('crimson');
-                        selectedObject = null;
-                    }
-                } else { selectedObject = null; }
-            }
-        }
-        window.addEventListener('click', onMouseClick, false);
-
-        // Resize event handler
-        function onWindowResize() {
-            toolbarWidth = toolbarContainer.clientWidth;
-            availableWidth = window.innerWidth - toolbarWidth;
+            const toolbarContainer = document.getElementById('toolbar');
+            let toolbarWidth = toolbarContainer.clientWidth;
+            let availableWidth = window.innerWidth - toolbarWidth;
+            const renderViewContainer = document.getElementById('renderView');
             renderViewContainer.style.width = availableWidth + 'px';
-            renderViewWidth = renderViewContainer.clientWidth;
+            let renderViewWidth = renderViewContainer.clientWidth;
+            let renderViewHeight = renderViewContainer.clientHeight;
             console.log(renderViewWidth, renderViewHeight, toolbarWidth);
 
-            camera.aspect = renderViewWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
+            const camera = new THREE.PerspectiveCamera(75, renderViewWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 5;
+            const renderer = new THREE.WebGLRenderer({ antialias: true }); // Enable anti-aliasing
+            renderer.setClearColor('lightcyan');
             renderer.setSize(renderViewWidth, window.innerHeight);
-        }
-        window.addEventListener('resize', onWindowResize, false);
+            document.body.appendChild(renderer.domElement);
 
-        // Render loop
-        function animate() {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
-        }
-        animate();
+            // Add a cube
+            const geometry = new THREE.BoxGeometry();
+            const material = new THREE.MeshStandardMaterial({
+                color: 'crimson',
+                side: THREE.DoubleSide // Render from both sides
+            });
+            const cube = new THREE.Mesh(geometry, material);
+            cube.userData.selectable = 'true'; // Add the attribute to the cube
+            objects.push(cube);
+            scene.add(cube);
+            // Add wireframe edges to the cube
+            const edges = new THREE.EdgesGeometry(geometry);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 'black' }));
+            cube.add(line);
 
-    </script>
+            // Add a green world land
+            const landGeometry = new THREE.PlaneGeometry(10, 10);
+            const landMaterial = new THREE.MeshStandardMaterial({
+                color: 'lightseagreen',
+                metalness: 0,
+                roughness: 0.1,
+                transparent: true,
+                opacity: 0.5,
+                side: THREE.DoubleSide // Render from both sides
+            });
+            const land = new THREE.Mesh(landGeometry, landMaterial);
+            land.rotation.x = Math.PI / 2; // Rotate the land to be perpendicular to the y-axis
+            land.position.y -= 0.5;
+            scene.add(land);
+
+            // Add a purple wall
+            const wallGeometry = new THREE.PlaneGeometry(10, 10);
+            const wallMaterial = new THREE.MeshStandardMaterial({
+                color: 'mediumpurple',
+                metalness: 0,
+                roughness: 0.1,
+                transparent: true,
+                opacity: 0.5,
+                side: THREE.DoubleSide // Render from both sides
+            });
+            const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+            scene.add(wall);
+
+            // Add ambient light
+            const ambientLight = new THREE.AmbientLight('white', 1);
+            scene.add(ambientLight);
+
+            // Add directional light
+            const directionalLight1 = new THREE.DirectionalLight('white', 0.5);
+            directionalLight1.position.set(5, 5, 5);
+            scene.add(directionalLight1);
+
+            const directionalLight2 = new THREE.DirectionalLight('white', 0.3);
+            directionalLight2.position.set(-5, 3, -2);
+            scene.add(directionalLight2);
+
+            //Enable shadows
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            // Make objects cast and receive shadows
+            cube.castShadow = true;
+            cube.receiveShadow = true;
+            land.receiveShadow = true;
+            wall.receiveShadow = true;
+
+            // Configure lights to cast shadows
+            directionalLight1.castShadow = true;
+            directionalLight1.shadow.mapSize.width = 512;
+            directionalLight1.shadow.mapSize.height = 512;
+            directionalLight1.shadow.camera.near = 0.1;
+            directionalLight1.shadow.camera.far = 500;
+            directionalLight2.castShadow = true;
+            directionalLight2.shadow.mapSize.width = 512;
+            directionalLight2.shadow.mapSize.height = 512;
+            directionalLight2.shadow.camera.near = 0.1;
+            directionalLight2.shadow.camera.far = 500;
+
+            // Prevent default context menu
+            document.addEventListener('contextmenu', (event) => {
+                event.preventDefault();
+            });
+
+            // Mouse event handlers
+            document.addEventListener('mousedown', (event) => {
+                isDragging = true;
+                frontPoint = getPointInFrontOfCamera(3);
+                selectAtMouseDown(selectedObject);
+                if (event.button == 0) {
+                    buttonPressed = "left";
+                    if (cube.userData.selected) {
+                        rotationBase = cube.position;
+                    }
+                    else { rotationBase = getPointInFrontOfCamera(3); }
+                    rotationRadius = getDistance(camera.position, rotationBase);
+                    theta = Math.atan2(camera.position.z - rotationBase.z, camera.position.x - rotationBase.x);
+                    phi = Math.acos((camera.position.y - rotationBase.y) / rotationRadius);
+                }
+                else if (event.button == 1) {
+                    buttonPressed = "middle";
+                    previousMousePosition = { x: event.clientX, y: event.clientY };
+                }
+                else if (event.button == 2) {
+                    buttonPressed = "right";
+                }
+                else { buttonPressed = "none"; }
+            });
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+                aroundObject = false;
+            });
+            document.addEventListener('mousemove', (event) => {
+                mouse.x = (event.clientX / availableWidth) * 2 - 1; // Normalize mouse x for Normalized Device Coordinates (NDC)
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1; // Normalize mouse y for NDC
+                if (!isDragging) return;
+                // This is basically rotation when left mouse button is held
+                if (buttonPressed == "left" && aroundObject) {
+                    const deltaX = event.clientX - aroundMousePosition.x;
+                    const deltaY = event.clientY - aroundMousePosition.y;
+                    aroundMousePosition = { x: event.clientX, y: event.clientY };
+                    theta += deltaX * 0.005;
+                    phi += -deltaY * 0.005;
+                    phi = Math.min(Math.PI - 0.01, Math.max(0.01, phi));
+
+                    camera.position.x = rotationBase.x + rotationRadius * Math.sin(phi) * Math.cos(theta);
+                    camera.position.y = rotationBase.y + rotationRadius * Math.cos(phi);
+                    camera.position.z = rotationBase.z + rotationRadius * Math.sin(phi) * Math.sin(theta);
+
+                    if (cube.userData.selected) { camera.lookAt(cube.position); }
+                    else { camera.lookAt(frontPoint); }
+                }
+                // This is only used to find the first mouse position for rotation setup
+                else if (buttonPressed == "left" && !aroundObject) {
+                    aroundMousePosition = { x: event.clientX, y: event.clientY };
+                }
+                // This is basically translation when middle mouse button is held
+                else if (buttonPressed == "middle") {
+                    const deltaX = event.clientX - previousMousePosition.x;
+                    const deltaY = event.clientY - previousMousePosition.y;
+                    previousMousePosition = { x: event.clientX, y: event.clientY };
+
+                    const cameraDeltaX = -deltaX * 0.01;
+                    const cameraDeltaY = deltaY * 0.01;
+
+                    const cameraDirection = new THREE.Vector3();
+                    camera.getWorldDirection(cameraDirection);
+
+                    const cameraRight = new THREE.Vector3();
+                    cameraRight.crossVectors(cameraDirection, new THREE.Vector3(0, 1, 0));
+                    cameraRight.normalize();
+
+                    const cameraUp = new THREE.Vector3();
+                    cameraUp.crossVectors(cameraRight, cameraDirection);
+                    cameraUp.normalize();
+
+                    camera.position.add(cameraRight.multiplyScalar(cameraDeltaX));
+                    camera.position.add(cameraUp.multiplyScalar(cameraDeltaY));
+                }
+                else {
+                    // Nothing happens
+                }
+                // This is triggered only after the mouse is pressed and the object is selected
+                aroundObject = true;
+            });
+
+            // Zoom-in event handler
+            document.addEventListener('wheel', (event) => {
+                const zoomSpeed = 0.003;
+                const zoomDirection = new THREE.Vector3();
+                camera.getWorldDirection(zoomDirection);
+                camera.position.add(zoomDirection.multiplyScalar(event.deltaY * zoomSpeed));
+                console.log('Zooming in...');
+            });
+
+            // Paint brush event handler
+            document.addEventListener('keydown', (event) => {
+                if (event.code === 'Space') {
+                    raycaster.setFromCamera(mouse, camera);
+                    console.log("paint brush activated");
+                    const intersects = raycaster.intersectObjects(scene.children);
+                    if (intersects.length > (0)) {
+                        const closestObject = intersects[0].object;
+                        if (closestObject.userData.selectable) {
+                            closestObject.material.color.set(activateBrushColor);
+                        }
+                    }
+                }
+            });
+
+            // Resize event handler
+            function onWindowResize() {
+                toolbarWidth = toolbarContainer.clientWidth;
+                availableWidth = window.innerWidth - toolbarWidth;
+                renderViewContainer.style.width = availableWidth + 'px';
+                renderViewWidth = renderViewContainer.clientWidth;
+                console.log(renderViewWidth, renderViewHeight, toolbarWidth);
+
+                camera.aspect = renderViewWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(renderViewWidth, window.innerHeight);
+            }
+            window.addEventListener('resize', onWindowResize, false);
+
+            // Render loop
+            function animate() {
+                requestAnimationFrame(animate);
+                renderer.render(scene, camera);
+            }
+            animate();
+
+        </script>
     </div>
 </body>
 
